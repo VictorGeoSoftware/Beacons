@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Beacons</string>
+
+    <string name="hello_world">Hello world!</string>
+    <string name="action_settings">Settings</string>
+    <string name="detecting_beacons">No hay beacons</string>
+    <string name="alt_beacon_library">Android Beacon Library</string>
+    <string name="native_bluetooth_library">Native Bluetooth Library</string>
+</resources>
