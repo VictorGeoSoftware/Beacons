@@ -6,4 +6,5 @@
     <string name="detecting_beacons">No hay beacons</string>
     <string name="alt_beacon_library">Android Beacon Library</string>
     <string name="native_bluetooth_library">Native Bluetooth Library</string>
+    <string name="estado_actual">Estado actual</string>
 </resources>

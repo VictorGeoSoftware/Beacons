@@ -6,6 +6,8 @@ import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.RemoteException;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -13,6 +15,7 @@ import android.view.View;
 import android.widget.AbsListView;
 import android.widget.FrameLayout;
 import android.widget.ListView;
+import android.widget.TextView;
 
 import com.mshop.movilidad.beacons.ArrayAdapters.BeaconsArrayAdapter;
 import com.mshop.movilidad.beacons.DataModels.BeaconDataModel;
@@ -32,9 +35,8 @@ import java.util.Collection;
 public class MainActivity extends Activity implements AbsListView.OnScrollListener, BeaconConsumer, View.OnClickListener{
 
     ListView lstBeacons;
-    View lstBeaconsHeaderView;
     FrameLayout layoutButtonBack;
-
+    TextView txtCurrentMesssage;
 
     BluetoothManager bluetoothManager;
     BluetoothAdapter mBluetoothAdapter;
@@ -69,9 +71,8 @@ public class MainActivity extends Activity implements AbsListView.OnScrollListen
         layoutButtonBack = (FrameLayout) findViewById(R.id.layout_button_backward);
         layoutButtonBack.setOnClickListener(this);
 
+        txtCurrentMesssage = (TextView) findViewById(R.id.txtCurrentMessage);
         lstBeacons = (ListView) findViewById(R.id.listView);
-        lstBeaconsHeaderView = getLayoutInflater().inflate(R.layout.view_header_refresh, null);
-        lstBeacons.addHeaderView(lstBeaconsHeaderView);
         lstBeacons.setAdapter(beaconsArrayAdapter);
 
         lstBeacons.smoothScrollToPosition(1);
@@ -129,16 +130,36 @@ public class MainActivity extends Activity implements AbsListView.OnScrollListen
         beaconManager.setMonitorNotifier(new MonitorNotifier() {
             @Override
             public void didEnterRegion(Region region) {
-
+                Log.i ("", "did enter region");
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        txtCurrentMesssage.setText(getString(R.string.estado_actual) + ": didEnterRegion");
+                    }
+                });
             }
 
             @Override
             public void didExitRegion(Region region) {
+                Log.i("", "did exit region");
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        txtCurrentMesssage.setText(getString(R.string.estado_actual) + ": didExitRegion");
+                    }
+                });
 
             }
 
             @Override
             public void didDetermineStateForRegion(int i, Region region) {
+                Log.i("", "did DetermineStateForRegion");
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        txtCurrentMesssage.setText(getString(R.string.estado_actual) + ": didDetermineStateForRegion");
+                    }
+                });
 
             }
         });
@@ -169,23 +190,36 @@ public class MainActivity extends Activity implements AbsListView.OnScrollListen
         });
 
         try {
-            beaconManager.startMonitoringBeaconsInRegion(new Region("myRegion", null, null, null));
+            new Handler().postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        beaconManager.startMonitoringBeaconsInRegion(new Region("myUniqueIdRegionVictor", null, null, null));
+                    } catch (RemoteException r){
+                        r.printStackTrace();
+                    }
+
+                }
+            }, 2000);
+            //beaconManager.startMonitoringBeaconsInRegion(new Region("myUniqueIdRegionVictor", null, null, null));
         } catch (Exception e) {
             e.printStackTrace();
         }
 
         try {
-            beaconManager.startRangingBeaconsInRegion(new Region("myRangeRegion", null, null, null));
+            //beaconManager.startRangingBeaconsInRegion(new Region("myRangeRegion", null, null, null));
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
     public void initializeBeaconClient () {
+        Log.i ("", "inicializa beacon client");
         beaconManager = BeaconManager.getInstanceForApplication(this);
         /*
         Aqui hay que probar con otros beacons que tengan el BeaconLayout más estandarizado
          */
+        beaconManager.getBeaconParsers().add(new BeaconParser().setBeaconLayout("m:2-3=beac,i:4-19,i:20-21,i:22-23,p:24-24,d:25-25"));
         beaconManager.getBeaconParsers().add(new BeaconParser().setBeaconLayout("m:2-3=0215,i:4-19,i:20-21,i:22-23,p:24-24"));
         beaconManager.bind(this);
     }
