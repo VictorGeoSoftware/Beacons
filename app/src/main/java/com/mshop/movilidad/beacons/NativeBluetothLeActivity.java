@@ -3,6 +3,9 @@ package com.mshop.movilidad.beacons;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothGatt;
+import android.bluetooth.BluetoothGattCallback;
+import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.content.Intent;
@@ -45,6 +48,7 @@ public class NativeBluetothLeActivity extends Activity implements View.OnClickLi
     BeaconDataModel emptyListPlaceholderItem;
     int REQUEST_ENABLE_BT = 1001;
     int firstVisibleListViewItem = 0;
+    static final char[] hexArray = "0123456789ABCDEF".toCharArray();
 
 
     @Override
@@ -144,14 +148,6 @@ public class NativeBluetothLeActivity extends Activity implements View.OnClickLi
                         scrBeaconList.smoothScrollTo(0, lstBeaconsHeaderView.getHeight());
                     }
                 });
-                
-//                runOnUiThread(new Runnable() {
-//                    @Override
-//                    public void run() {
-//                        Log.i("", "entra 1: " + lstBeaconsHeaderView.getHeight());
-//                        scrBeaconList.scrollTo(0, lstBeaconsHeaderView.getHeight());
-//                    }
-//                });
             }
         }
 
@@ -163,8 +159,24 @@ public class NativeBluetothLeActivity extends Activity implements View.OnClickLi
         @Override
         public void onLeScan(BluetoothDevice device, int rssi, byte[] scanRecord) {
             Log.i("", "dispositivo: " + device.getAddress() + " " + rssi + " " + device.getType());
-            BeaconDataModel beacon = new BeaconDataModel(device.getAddress(), Integer.toString(device.getType()), Integer.toString(rssi));
+
+            BeaconDataModel beacon = new BeaconDataModel(device.getAddress(), getBeaconUuid(scanRecord), Integer.toString(rssi));
             checkIncomingBeacon(beacon);
+
+            device.connectGatt(NativeBluetothLeActivity.this, true, new BluetoothGattCallback() {
+                @Override
+                public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+                    super.onConnectionStateChange(gatt, status, newState);
+
+                    Log.i("", "dispositivo conection: " + status + " " + newState);
+                }
+
+                @Override
+                public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+                    super.onCharacteristicRead(gatt, characteristic, status);
+                    Log.i("", "dispositivo on characteristic read: " + characteristic.getStringValue(0));
+                }
+            });
         }
     };
 
@@ -199,6 +211,69 @@ public class NativeBluetothLeActivity extends Activity implements View.OnClickLi
         if (!alreadyRegistered) {
             beaconsArrayList.add(beacon);
         }
+    }
+
+    public double calculateDistance(int txPower, double rssi) {
+        if (rssi == 0) {
+            return -1.0; // if we cannot determine accuracy, return -1.
+        }
+
+        double ratio = rssi*1.0/txPower;
+
+        if (ratio < 1.0) {
+            return Math.pow(ratio,10);
+        } else {
+            double accuracy =  (0.89976)*Math.pow(ratio,7.7095) + 0.111;
+            return accuracy;
+        }
+    }
+
+    public String getBeaconUuid (byte[] scanRecord) {
+        int startByte = 2;
+        boolean patternFound = false;
+        String uuid = "";
+
+        while (startByte <= 5) {
+            if (    ((int) scanRecord[startByte + 2] & 0xff) == 0x02 && //Identifies an iBeacon
+                    ((int) scanRecord[startByte + 3] & 0xff) == 0x15) { //Identifies correct data length
+                patternFound = true;
+                break;
+            }
+
+            startByte++;
+        }
+
+        if (patternFound) {
+            //Convert to hex String
+            byte[] uuidBytes = new byte[16];
+            System.arraycopy(scanRecord, startByte+4, uuidBytes, 0, 16);
+            String hexString = bytesToHex(uuidBytes);
+
+            //Here is your UUID
+            uuid =  hexString.substring(0,8) + "-" +
+                    hexString.substring(8,12) + "-" +
+                    hexString.substring(12,16) + "-" +
+                    hexString.substring(16,20) + "-" +
+                    hexString.substring(20,32);
+
+            //Here is your Major value
+            int major = (scanRecord[startByte+20] & 0xff) * 0x100 + (scanRecord[startByte+21] & 0xff);
+
+            //Here is your Minor value
+            int minor = (scanRecord[startByte+22] & 0xff) * 0x100 + (scanRecord[startByte+23] & 0xff);
+        }
+
+        return uuid;
+    }
+
+    private static String bytesToHex(byte[] bytes) {
+        char[] hexChars = new char[bytes.length * 2];
+        for ( int j = 0; j < bytes.length; j++ ) {
+            int v = bytes[j] & 0xFF;
+            hexChars[j * 2] = hexArray[v >>> 4];
+            hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+        }
+        return new String(hexChars);
     }
 
     public static void setListViewHeightBasedOnChildren(ListView listView) {

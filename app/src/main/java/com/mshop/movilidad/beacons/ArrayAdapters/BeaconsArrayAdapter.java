@@ -8,8 +8,10 @@ import android.widget.ArrayAdapter;
 import android.widget.TextView;
 
 import com.mshop.movilidad.beacons.DataModels.BeaconDataModel;
+import com.mshop.movilidad.beacons.NativeBluetothLeActivity;
 import com.mshop.movilidad.beacons.R;
 
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 
 /**
@@ -46,8 +48,24 @@ public class BeaconsArrayAdapter extends ArrayAdapter<BeaconDataModel> {
         }
 
         holder.txtMac.setText(beaconsArrayList.get(position).getMac());
-        holder.txtData.setText("Tipo: " + beaconsArrayList.get(position).getData());
-        holder.txtRange.setText("Rssi: " + beaconsArrayList.get(position).getRange());
+
+        if (aContext instanceof NativeBluetothLeActivity) {
+            holder.txtData.setText("UUID: " + beaconsArrayList.get(position).getData());
+            holder.txtRange.setText("Rssi: " + beaconsArrayList.get(position).getRange());
+        } else {
+            DecimalFormat format = new DecimalFormat("0.00");
+            double distance = 0;
+
+            try {
+                distance = Double.parseDouble(beaconsArrayList.get(position).getRange());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            holder.txtData.setText("Rssi: " + beaconsArrayList.get(position).getData());
+            holder.txtRange.setText("Distancia: " + format.format(distance) + " m");
+        }
+
 
 
         return convertView;

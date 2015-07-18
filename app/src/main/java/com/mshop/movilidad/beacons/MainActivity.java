@@ -45,7 +45,10 @@ public class MainActivity extends Activity implements AbsListView.OnScrollListen
 
     ArrayList<BeaconDataModel> beaconsArrayList = new ArrayList<>();
     BeaconsArrayAdapter beaconsArrayAdapter;
+    BeaconDataModel emptyListPlaceholderItem;
     int REQUEST_ENABLE_BT = 1001;
+
+    Region currentRegion;
 
 
     @Override
@@ -64,7 +67,7 @@ public class MainActivity extends Activity implements AbsListView.OnScrollListen
         }
 
 
-        BeaconDataModel emptyListPlaceholderItem = new BeaconDataModel(getString(R.string.detecting_beacons), "--", "--");
+        emptyListPlaceholderItem = new BeaconDataModel(getString(R.string.detecting_beacons), "--", "--");
         beaconsArrayList.add(emptyListPlaceholderItem);
         beaconsArrayAdapter = new BeaconsArrayAdapter(this, beaconsArrayList);
 
@@ -130,22 +133,24 @@ public class MainActivity extends Activity implements AbsListView.OnScrollListen
         beaconManager.setMonitorNotifier(new MonitorNotifier() {
             @Override
             public void didEnterRegion(Region region) {
-                Log.i ("", "did enter region");
+                Log.i("", "did enter region");
+                currentRegion = region;
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        txtCurrentMesssage.setText(getString(R.string.estado_actual) + ": didEnterRegion");
+                        txtCurrentMesssage.setText(getString(R.string.estado_actual) + ": didEnterRegion " + currentRegion.getUniqueId());
                     }
                 });
             }
 
             @Override
-            public void didExitRegion(Region region) {
+            public void didExitRegion(final Region region) {
                 Log.i("", "did exit region");
+                currentRegion = region;
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        txtCurrentMesssage.setText(getString(R.string.estado_actual) + ": didExitRegion");
+                        txtCurrentMesssage.setText(getString(R.string.estado_actual) + ": didExitRegion" + currentRegion.getUniqueId());
                     }
                 });
 
@@ -154,10 +159,11 @@ public class MainActivity extends Activity implements AbsListView.OnScrollListen
             @Override
             public void didDetermineStateForRegion(int i, Region region) {
                 Log.i("", "did DetermineStateForRegion");
+                currentRegion = region;
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        txtCurrentMesssage.setText(getString(R.string.estado_actual) + ": didDetermineStateForRegion");
+                        txtCurrentMesssage.setText(getString(R.string.estado_actual) + ": didDetermineStateForRegion" + currentRegion.getUniqueId());
                     }
                 });
 
@@ -167,60 +173,62 @@ public class MainActivity extends Activity implements AbsListView.OnScrollListen
         beaconManager.setRangeNotifier(new RangeNotifier() {
             @Override
             public void didRangeBeaconsInRegion(Collection<Beacon> beacons, Region region) {
-                if (beacons.size() > 1) {
-                    Log.i("", "Beacon a: " + beacons.iterator().next().getDistance() + " m");
+                for (Beacon beacon : beacons) {
+                    BeaconDataModel newBeacon = new BeaconDataModel(
+                            beacon.getBluetoothAddress(),
+                            Integer.toString(beacon.getRssi()),
+                            Double.toString(beacon.getDistance()));
 
-                    beaconsArrayList.clear();
-                    beaconsArrayAdapter.clear();
-
-                    while (beacons.iterator().hasNext()){
-                        BeaconDataModel beacon = new BeaconDataModel(
-                                beacons.iterator().next().getBluetoothAddress(),
-                                Integer.toString(beacons.iterator().next().getTxPower()),
-                                Double.toString(beacons.iterator().next().getDistance())
-                        );
-
-                        beaconsArrayList.add(beacon);
-                    }
-
-                    beaconsArrayAdapter = new BeaconsArrayAdapter(MainActivity.this, beaconsArrayList);
-                    lstBeacons.setAdapter(beaconsArrayAdapter);
+                    checkIncomingBeacon(newBeacon);
                 }
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        beaconsArrayAdapter.notifyDataSetChanged();
+                    }
+                });
             }
         });
 
+        /*
+            NO PUEDEN EMPEZAR A LA VEZ. NO FUNCIONA!!
+         */
         try {
             new Handler().postDelayed(new Runnable() {
                 @Override
                 public void run() {
                     try {
-                        beaconManager.startMonitoringBeaconsInRegion(new Region("myUniqueIdRegionVictor", null, null, null));
-                    } catch (RemoteException r){
+                        beaconManager.startMonitoringBeaconsInRegion(new Region("Victor", null, null, null));
+                    } catch (RemoteException r) {
                         r.printStackTrace();
                     }
-
                 }
-            }, 2000);
-            //beaconManager.startMonitoringBeaconsInRegion(new Region("myUniqueIdRegionVictor", null, null, null));
+            }, 500);
+
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        try {
-            //beaconManager.startRangingBeaconsInRegion(new Region("myRangeRegion", null, null, null));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        new Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    beaconManager.startRangingBeaconsInRegion(new Region("Victor", null, null, null));
+                } catch (RemoteException e) {
+                    e.printStackTrace();
+                }
+            }
+        }, 1000);
     }
 
     public void initializeBeaconClient () {
-        Log.i ("", "inicializa beacon client");
         beaconManager = BeaconManager.getInstanceForApplication(this);
-        /*
-        Aqui hay que probar con otros beacons que tengan el BeaconLayout más estandarizado
-         */
+
         beaconManager.getBeaconParsers().add(new BeaconParser().setBeaconLayout("m:2-3=beac,i:4-19,i:20-21,i:22-23,p:24-24,d:25-25"));
         beaconManager.getBeaconParsers().add(new BeaconParser().setBeaconLayout("m:2-3=0215,i:4-19,i:20-21,i:22-23,p:24-24"));
+        beaconManager.getBeaconParsers().add(new BeaconParser().setBeaconLayout("m:2-3=0215,i:4-19,i:20-21,i:22-23,p:24-24,d:25-25"));
+
         beaconManager.bind(this);
     }
 
@@ -232,4 +240,27 @@ public class MainActivity extends Activity implements AbsListView.OnScrollListen
             overridePendingTransition(R.anim.fragment_enter_from_left, R.anim.fragment_exit_to_right);
         }
     }
+
+    public void checkIncomingBeacon (BeaconDataModel beacon) {
+        boolean alreadyRegistered = false;
+
+        if (beaconsArrayList.contains(emptyListPlaceholderItem)) {
+            beaconsArrayList.remove(emptyListPlaceholderItem);
+        }
+
+        for (int i = 0; i < beaconsArrayList.size(); i++) {
+            if (beaconsArrayList.get(i).getMac().contentEquals(beacon.getMac())) {
+                beaconsArrayList.get(i).setData(beacon.getData());
+                beaconsArrayList.get(i).setRange(beacon.getRange());
+                alreadyRegistered = true;
+                break;
+            }
+        }
+
+        Log.i ("", "beacon registered: " + alreadyRegistered);
+        if (!alreadyRegistered) {
+            beaconsArrayList.add(beacon);
+        }
+    }
+
 }
